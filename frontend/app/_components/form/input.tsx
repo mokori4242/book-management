@@ -32,7 +32,7 @@ export function Input({
         onChange={onChange}
         required={required}
         placeholder={placeholder}
-        className={`w-full border-0 bg-white p-2 focus:outline-none ${className}`}
+        className={`w-full border-0 bg-white p-2 focus:outline-none text-black ${className}`}
       />
     </div>
   );
