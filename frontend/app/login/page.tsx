@@ -32,6 +32,23 @@ export default function LoginPage() {
     if (email) setEmailError(validateEmail(email));
   }, [email]);
 
+  /**
+   * 提供されたキーに基づいてクッキーの値を取得します。
+   *
+   * @param {string} key - 値を取得するクッキーのキー。
+   * @return {string} 提供されたキーに対応するクッキーの値。キーが見つからない場合は空の文字列を返します。
+   */
+  const getCookieValue = (key: string): string => {
+    const cookies = document.cookie.split(';')
+    for (const cookie of cookies) {
+      const cookiesArray = cookie.split('=')
+      if (cookiesArray[0].trim() == key.trim()) {
+        return cookiesArray[1] // (key[0],value[1])
+      }
+    }
+    return ''
+  }
+
   useEffect(() => {
     if (password) setPasswordError(validatePassword(password));
   }, [password]);
@@ -51,9 +68,15 @@ export default function LoginPage() {
     }
 
     try {
+      await fetch('http://localhost:8000/sanctum/csrf-cookie', {
+        method: 'GET',
+      });
+
       await fetch('http://localhost:8000/api/login', {
         method: 'POST',
+        credentials: 'include',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),

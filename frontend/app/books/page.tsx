@@ -1,47 +1,120 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useDebouncedCallback } from 'use-debounce';
 import BookCard from '../_components/books/bookCard';
 
-// 書籍データ（サンプル）
-const BOOKS = [
-  { id: 1, title: 'THE BOOK LIFE', isbn: '80887', author: 'AUTHOR' },
-  { id: 2, title: 'THE BONN LIFE', isbn: '40647', author: 'AUTHOR' },
-  { id: 3, title: 'THE BOOK\'S INDS', isbn: '43787', author: 'AUTHOR' },
-  { id: 4, title: 'THE BOOK LIFE', isbn: '40831', author: 'AUTHOR' },
-  { id: 5, title: 'THE BOOK LIFE', isbn: '30977', author: 'AUTHOR' },
-  { id: 6, title: 'THE BOOK LIFE', isbn: '80210', author: 'AUTHOR' },
-  { id: 7, title: 'THE BOOK LIFE', isbn: '90210', author: 'AUTHOR' },
-  { id: 8, title: 'THE BOOK LIFE', isbn: '10293', author: 'AUTHOR' },
-  { id: 9, title: 'THE BOOK LIFE', isbn: '38475', author: 'AUTHOR' },
-  { id: 10, title: 'THE BOOK LIFE', isbn: '58392', author: 'AUTHOR' },
-  { id: 11, title: 'THE BOOK LIFE', isbn: '29384', author: 'AUTHOR' },
-  { id: 12, title: 'THE BOOK LIFE', isbn: '39485', author: 'AUTHOR' },
-];
+interface Book {
+  id: number;
+  title: string;
+  isbn: string;
+  authors: string[];
+  status: 'AVAILABLE' | 'BORROWED';
+}
+
+interface PaginationMeta {
+  current_page: number;
+  from: number;
+  last_page: number;
+  per_page: number;
+  to: number;
+  total: number;
+}
+
+interface PaginationLinks {
+  first: string;
+  last: string;
+  prev: string | null;
+  next: string | null;
+}
+
+interface ApiResponse {
+  data: Book[];
+  links: PaginationLinks;
+  meta: PaginationMeta;
+}
 
 export default function BooksPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const booksPerPage = 10;
+  const [books, setBooks] = useState<Book[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
+  const [inputValue, setInputValue] = useState('');
 
-  // 検索機能
-  const filteredBooks = BOOKS.filter(book =>
-    book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    book.isbn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    book.author.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const { replace } = useRouter();
 
-  // ページネーション計算
-  const indexOfLastBook = currentPage * booksPerPage;
-  const indexOfFirstBook = indexOfLastBook - booksPerPage;
-  const currentBooks = filteredBooks.slice(indexOfFirstBook, indexOfLastBook);
-  const totalPages = Math.ceil(filteredBooks.length / booksPerPage);
+  const currentPage = Number(searchParams.get('page')) || 1;
+  const searchQuery = searchParams.get('title') || '';
+
+  // 検索ハンドラー（遅延処理）
+  const handleSearch = useDebouncedCallback((term: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (term) {
+      params.set('title', term);
+    } else {
+      params.delete('title');
+    }
+    params.set('page', '1'); // 検索時は1ページ目に戻す
+    replace(`${pathname}?${params.toString()}`);
+  }, 500); // 500ミリ秒の遅延
+
+  // 入力値の更新ハンドラー
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+    handleSearch(value);
+  };
+
+  // 書籍データの取得
+  useEffect(() => {
+    const fetchBooks = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (searchQuery) params.set('title', searchQuery);
+        params.set('page', currentPage.toString());
+
+        const response = await fetch(`http://localhost:8000/api/books?${params.toString()}`, {
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data: ApiResponse = await response.json();
+          setBooks(data.data);
+          setPaginationMeta(data.meta);
+        } else {
+          console.error('書籍データの取得に失敗しました');
+        }
+      } catch (error) {
+        console.error('サーバーとの通信に失敗しました:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBooks();
+  }, [currentPage, searchQuery]);
 
   // ページ変更ハンドラー
   const handlePageChange = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
+    const params = new URLSearchParams(searchParams);
+    params.set('page', pageNumber.toString());
+    replace(`${pathname}?${params.toString()}`);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f0ebe5] p-8 flex items-center justify-center">
+        <div className="text-xl">読み込み中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f0ebe5] p-8">
@@ -51,8 +124,8 @@ export default function BooksPage() {
           <input
             type="text"
             placeholder="SEARCH"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={inputValue}
+            onChange={handleInputChange}
             className="w-full py-3 px-4 pr-12 bg-black text-white rounded-full focus:outline-none"
           />
           <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
@@ -65,7 +138,7 @@ export default function BooksPage() {
 
       {/* 書籍カードグリッド */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        {currentBooks.map(book => (
+        {books.map(book => (
           <Link href={`/books/${book.id}`} key={book.id}>
             <BookCard book={book} />
           </Link>
@@ -73,10 +146,10 @@ export default function BooksPage() {
       </div>
 
       {/* ページネーション */}
-      {totalPages > 1 && (
+      {paginationMeta && paginationMeta.last_page > 1 && (
         <div className="flex justify-center mt-10">
           <div className="flex space-x-2">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            {Array.from({ length: paginationMeta.last_page }, (_, i) => i + 1).map((page) => (
               <button
                 key={page}
                 onClick={() => handlePageChange(page)}
