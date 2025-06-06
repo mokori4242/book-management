@@ -137,7 +137,7 @@ export default function BooksPage() {
       </div>
 
       {/* 書籍カードグリッド */}
-      <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="mx-auto grid sm:grid-cols-1 lg:grid-cols-5 gap-4">
         {books.map(book => (
           <Link href={`/books/${book.id}`} key={book.id}>
             <BookCard book={book} />
