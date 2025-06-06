@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { TypographyH1 } from '../_components/typography/h1';
 import { TypographyP } from '../_components/typography/p';
 import { Input } from '../_components/form/input';
@@ -8,6 +9,7 @@ import { FormField } from '../_components/form/formField';
 import { ErrorMessage } from '../_components/error/message';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
@@ -30,6 +32,23 @@ export default function LoginPage() {
     if (email) setEmailError(validateEmail(email));
   }, [email]);
 
+  /**
+   * 提供されたキーに基づいてクッキーの値を取得します。
+   *
+   * @param {string} key - 値を取得するクッキーのキー。
+   * @return {string} 提供されたキーに対応するクッキーの値。キーが見つからない場合は空の文字列を返します。
+   */
+  const getCookieValue = (key: string): string => {
+    const cookies = document.cookie.split(';')
+    for (const cookie of cookies) {
+      const cookiesArray = cookie.split('=')
+      if (cookiesArray[0].trim() == key.trim()) {
+        return cookiesArray[1] // (key[0],value[1])
+      }
+    }
+    return ''
+  }
+
   useEffect(() => {
     if (password) setPasswordError(validatePassword(password));
   }, [password]);
@@ -49,21 +68,21 @@ export default function LoginPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/login', {
+      await fetch('http://localhost:8000/sanctum/csrf-cookie', {
+        method: 'GET',
+      });
+
+      await fetch('http://localhost:8000/api/login', {
         method: 'POST',
+        credentials: 'include',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        alert('ログインに成功しました');
-        // ログイン成功後の処理をここに追加
-      } else {
-        const errorData = await response.json();
-      }
+      router.push('/books');
     } catch (error) {
       alert('サーバーとの通信に失敗しました');
     }
